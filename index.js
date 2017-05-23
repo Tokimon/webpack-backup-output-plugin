@@ -1,5 +1,5 @@
 const nPath = require('path');
-const fs = require('fs');
+const fs = require('fs-extra');
 const color = require('colors/safe');
 
 require('date-format-lite');
@@ -39,17 +39,16 @@ class BackupOutputPlugin {
       const action = removeOutputFolder ? 'move' : 'copy';
       backupPath = nPath.resolve(backupRoot, `${outputPath}-${(new Date()).format('YYYY-MM-DD-HH-mm-ss')}`);
 
-      fs.stat(outputPath, (err) => {
-        if(err) { return; }
-
-        fs[action](outputPath, backupPath, (err) => {
-          err
-            ? displayError('Failed to CREATE backup', err)
-            : console.log(color.green('BACKUP CREATED'));
-
+      fs.stat(outputPath)
+        .then(() => fs[action](outputPath, backupPath))
+        .then(() => {
+          console.log(color.green('BACKUP CREATED'));
+          cb();
+        })
+        .catch((err) => {
+          displayError('Failed to CREATE backup', err);
           cb();
         });
-      });
     });
   }
 }
