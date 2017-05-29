@@ -17,38 +17,60 @@ function relativeToCwd(path) {
     .replace(/^([.][.]?[\\/])*/, '');
 }
 
+let outputsBackedUp = new Map();
+
 class BackupOutputPlugin {
   constructor(options) {
-    this.options = Object.assign({
+    options = Object.assign({
       removeOutputFolder: true,
-      backupRoot: cwd
+      backupRoot: '_webpack-backup'
     }, options);
 
-    this.options.backupRoot = relativeToCwd(this.options.backupRoot);
+    this.options = options;
   }
 
   apply(compiler) {
-    const options = this.options;
-    let backupPath;
-    let { backupRoot, removeOutputFolder } = options;
+    let { backupRoot, removeOutputFolder } = this.options;
 
     compiler.plugin('emit', (compilation, cb) => {
-      if(backupPath) { return cb(); }
+      let { outputPath } = compiler;
 
-      const outputPath = relativeToCwd(compiler.outputPath);
-      const action = removeOutputFolder ? 'move' : 'copy';
-      backupPath = nPath.resolve(backupRoot, `${outputPath}-${(new Date()).format('YYYY-MM-DD-HH-mm-ss')}`);
+      let prom = outputsBackedUp.get(outputPath);
 
-      fs.stat(outputPath)
-        .then(() => fs[action](outputPath, backupPath))
-        .then(() => {
-          console.log(color.green('BACKUP CREATED'));
-          cb();
-        })
-        .catch((err) => {
-          displayError('Failed to CREATE backup', err);
-          cb();
-        });
+      if(!prom) {
+        const outputPathRelative = relativeToCwd(outputPath);
+
+        if(typeof backupRoot !== 'string') {
+          if(removeOutputFolder) {
+            prom = fs.remove(outputPath)
+              .then(() => console.log(color.yellow('OUTPUT FOLDER REMOVED'), ':', outputPath))
+              .catch((err) => {
+                displayError('Failed REMOVE output folder', err);
+              });
+          } else {
+            prom = Promise.resolve();
+          }
+        } else {
+          const action = removeOutputFolder ? 'move' : 'copy';
+          const backupPath = nPath.resolve(
+            relativeToCwd(backupRoot),
+            `${outputPathRelative}-${(new Date()).format('YYYY-MM-DD-HH-mm-ss')}`
+          );
+
+          prom = fs.stat(outputPath)
+            .then(() =>
+              fs[action](outputPath, backupPath)
+                .then(() => console.log(color.green('BACKUP CREATED'), ':', backupPath))
+                .catch((err) => {
+                  displayError('Failed to CREATE backup', err);
+                })
+            );
+        }
+
+        outputsBackedUp.set(outputPath, prom);
+      }
+
+      prom.then(() => cb());
     });
   }
 }
