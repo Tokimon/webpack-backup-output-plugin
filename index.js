@@ -54,7 +54,7 @@ class BackupOutputPlugin {
           const action = removeOutputFolder ? 'move' : 'copy';
           const backupPath = nPath.resolve(
             relativeToCwd(backupRoot),
-            `${outputPathRelative}-${(new Date()).format('YYYY-MM-DD-HH-mm-ss')}`
+            `${outputPathRelative}-${(new Date()).format('YYYY-MM-DD-hh-mm-ss')}`
           );
 
           prom = fs.stat(outputPath)
