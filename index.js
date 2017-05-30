@@ -64,7 +64,8 @@ class BackupOutputPlugin {
                 .catch((err) => {
                   displayError('Failed to CREATE backup', err);
                 })
-            );
+            )
+            .catch(() => console.log(color.yellow('No output to backup')));
         }
 
         outputsBackedUp.set(outputPath, prom);
