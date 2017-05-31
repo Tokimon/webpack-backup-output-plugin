@@ -73,7 +73,8 @@ var WebpackBackupOutputPlugin = require('webpack-backup-output-plugin/index.es5'
 
 ## Setup multi bundler config
 
-The plugin looks at the designated output folder (formed into a full path from the root of the current project) to determine if a backup (and possible remove) is going on before emitting files to this folder.
+The plugin looks at the designated output path (formed into a full path from the root of the current project)
+to determine if a backup (and possible remove) is going on before emitting files to this folder.
 
 This however requires the plugin to be added to each config, and for the compilations to share the same NodeJS instance.
 
@@ -81,7 +82,7 @@ This however requires the plugin to be added to each config, and for the compila
 // Config 1
 const config1 = {
   output: {
-    publicPath: `/public/`,
+    path: `/public`,
     filename: '[name].js?[chunkhash]'
   },
   ... other settings ...
@@ -93,8 +94,8 @@ const config1 = {
 // Config 2
 const config2 = {
   output: {
-    // Same output is needed to have it wait for the backup to complete
-    publicPath: `/public/`
+    // Same output path is needed to have it wait for the backup to complete
+    path: `/public`,
   },
   ... other settings ...
   plugins: [
@@ -105,9 +106,9 @@ const config2 = {
 // Config 3 (not affected by the backup)
 const config3 = {
   output: {
-    // Having another public path makes it ignorant to
-    // the previous backups and only wait for its own backup to finish
-    publicPath: `/web/`
+    // Having another path makes it ignorant to the previous
+    // backups and only wait for its own backup to finish
+    path: `/web`
   },
   ... other settings ...
   plugins: [
