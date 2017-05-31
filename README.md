@@ -27,7 +27,7 @@ yarn add --dev webpack-backup-output-plugin
 ## Options
 
 * **removeOutputFolder**: [boolean=true] Remove the output folder after backup
-* **backupRoot**: [string|boolean=process.cwd()] Folder where to put backups (relative to current work directory),
+* **backupRoot**: [string|boolean='\_webpack-backup'] Folder where to put backups (relative to current work directory),
 if false is given, no backup will be made. True falls back to `process.cwd()`.
 
 ## Usage
