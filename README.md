@@ -26,9 +26,10 @@ yarn add --dev webpack-backup-output-plugin
 
 ## Options
 
-* **removeOutputFolder**: [boolean=true] Remove the output folder after backup
-* **backupRoot**: [string|boolean='\_webpack-backup'] Folder where to put backups (relative to current work directory),
-if false is given, no backup will be made. True falls back to `process.cwd()`.
+* **clean**: [boolean=true] Remove the files in the output folder before emit
+* **backup**: [boolean=true] Backup files in the output folder
+* **files**: [string|string[]=`**/*.*`] Which files to backup and/or remove (glob expressions)
+* **backupRoot**: [string|boolean='\_webpack-backup'] Folder where to put backups (relative to current work directory).
 
 ## Usage
 
@@ -47,7 +48,7 @@ import WebpackBackupOutputPlugin from 'webpack-backup-output-plugin';
 
 #### ES5 (cjs)
 ```js
-var WebpackBackupOutputPlugin = require('webpack-backup-output-plugin/index.es5').default;
+var WebpackBackupOutputPlugin = require('webpack-backup-output-plugin').default;
 
 // In the config
 {
@@ -64,8 +65,8 @@ var WebpackBackupOutputPlugin = require('webpack-backup-output-plugin/index.es5'
   plugins: [
     // Will result in a sort of "clean folder" (eg when in development)
     new WebpackBackupOutputPlugin({
-      removeOutputFolder: true, // Will cause the output folder to be removed
-      backupRoot: false // Won't create the backup
+      clean: true, // Will cause the designated files in the output folder to be removed
+      backup: false // Won't create the backup
     })
   ]
 }
@@ -73,11 +74,12 @@ var WebpackBackupOutputPlugin = require('webpack-backup-output-plugin/index.es5'
 
 ## Setup multi bundler config
 
-The plugin looks at the designated output path (formed into a full path from the root of the current project)
-to determine if a backup (and possible remove) is going on before emitting files to this folder.
+Defining the plugin for several config that are run simultaneously is possible,
+but you should make sure to define what type of file you want to handle in the
+setup. But often you just want one config to handle the backup, so you just add
+it to one config
 
-This however requires the plugin to be added to each config, and for the compilations to share the same NodeJS instance.
-
+#### Example of differntiated backups
 ```js
 // Config 1
 const config1 = {
@@ -87,7 +89,9 @@ const config1 = {
   },
   ... other settings ...
   plugins: [
-    new WebpackBackupOutputPlugin()
+    new WebpackBackupOutputPlugin({
+      files: ['**/*.png', '*.js']
+    })
   ]
 }
 
@@ -99,11 +103,13 @@ const config2 = {
   },
   ... other settings ...
   plugins: [
-    new WebpackBackupOutputPlugin()
+    new WebpackBackupOutputPlugin({
+      files: ['**/*.js']
+    )
   ]
 }
 
-// Config 3 (not affected by the backup)
+// Config 3 (not affected by the previous backups)
 const config3 = {
   output: {
     // Having another path makes it ignorant to the previous
