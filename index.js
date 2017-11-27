@@ -1,88 +1,143 @@
 const nPath = require('path');
 const fs = require('fs-extra');
 const color = require('colors/safe');
+const glob = require('globby');
+const dateformat = require('dateformat');
 
-require('date-format-lite');
+
 
 const cwd = process.cwd();
 
-function displayError(message, err) {
-  console.log(color.yellow(message));
-  console.error(err.message);
-  err.stack && console.error(err.stack);
-}
+
 
 function relativeToCwd(path) {
   return nPath.relative(cwd, nPath.normalize(path))
-    .replace(/^([.][.]?[\\/])*/, '');
+    .replace(/([.][.]?[\\/])*/, '');
 }
 
-let outputsBackedUp = new Map();
+
+
+const defaultSettings = {
+  clean: true,
+  backup: true,
+  files: '**/*.*',
+  backupRoot: '_webpack-backup'
+};
+
+
 
 class BackupOutputPlugin {
   constructor(options) {
-    options = Object.assign({
-      removeOutputFolder: true,
-      backupRoot: '_webpack-backup'
-    }, options);
+    this.options = Object.assign(defaultSettings, options);
+    this.logs = [];
+    this.errors = [];
+  }
 
-    this.options = options;
+  removeFiles(files) {
+    return Promise.all(files.map((file) => fs.remove(file)))
+      .then(() => {
+        this.logs.push('Output folder cleaned');
+        return files;
+      })
+      .catch((error) => {
+        this.errors.push({
+          message: 'Failed to delete one or more files',
+          error
+        });
+
+        return files;
+      });
+  }
+
+  backupFiles(files) {
+    const { backupRoot } = this.options;
+    const backupPath = nPath.join(cwd, backupRoot, dateformat(new Date(), 'yyyy-mm-dd-HH-MM'));
+
+    return fs.stat(this.outputPath)
+      .then(() =>
+        Promise.all(
+          files.map(
+            (file) => {
+              const copyPath = nPath.join(backupPath, nPath.relative(this.outputPath, file));
+              return fs.copy(file, copyPath);
+            }
+          )
+        )
+          .then(() => {
+            this.logs.push('Files successfully backed up');
+            return files;
+          })
+          .catch((error) => {
+            this.errors.push({
+              message: 'Failed to backup one or more files',
+              error
+            });
+
+            return files;
+          })
+      )
+      .catch(() => {
+        this.logs.push('No files in output folder to backup');
+        return files;
+      });
+  }
+
+  displayFeedback() {
+    /* eslint-disable no-console */
+    console.log('\n--- Backup Plugin ---');
+
+    this.logs.forEach((message) => console.log(color.yellow('- ' + message)));
+
+    this.errors.forEach(({ message, error }) => {
+      console.log(color.red(message));
+      console.error(error.message);
+      error.stack && console.errors(error.stack);
+    });
+
+    console.log('---------------------\n');
+    /* eslint-enable */
   }
 
   apply(compiler) {
-    let { backupRoot, removeOutputFolder } = this.options;
+    let outputPath = compiler.options.output.path;
+    let { files: fileGlobs } = this.options;
+    const { clean, backup } = this.options;
 
-    compiler.plugin('emit', (compilation, cb) => {
-      let { outputPath } = compiler;
-      outputPath = outputPath.replace(/[/\\]+$/, '');
+    this.outputPath = relativeToCwd(outputPath);
 
-      let prom = outputsBackedUp.get(outputPath);
+    fileGlobs = (typeof fileGlobs === 'string' ? [fileGlobs] : fileGlobs)
+      .map((file) => nPath.join(this.outputPath, file));
 
-      if(!prom) {
-        const outputPathRelative = relativeToCwd(outputPath);
+    compiler.plugin('run', (compilation, cb) => {
+      this.logs = [];
+      this.errors = [];
 
-        if(backupRoot === true) { backupRoot = ''; }
+      // We do the backup while compiler is running to save some time
+      this.fileProm = glob(fileGlobs);
 
-        if(typeof backupRoot !== 'string') {
-          // If no "backupRoot" is given we either remove the fodler or just
-          // continue without doing more
-
-          if(removeOutputFolder) {
-            // Remove folder
-            prom = fs.remove(outputPath)
-              .then(() => console.log(color.yellow('OUTPUT FOLDER REMOVED'), ':', outputPath))
-              .catch((err) => {
-                displayError('Failed REMOVE output folder', err);
-              });
-          } else {
-            // Do nothing
-            prom = Promise.resolve();
-          }
-        } else {
-          // Create the backup
-
-          const action = removeOutputFolder ? 'move' : 'copy';
-          const backupPath = nPath.resolve(
-            relativeToCwd(backupRoot),
-            `${outputPathRelative}-${(new Date()).format('YYYY-MM-DD-hh-mm-ss')}`
-          );
-
-          prom = fs.stat(outputPath)
-            .then(() =>
-              fs[action](outputPath, backupPath)
-                .then(() => console.log(color.green('BACKUP CREATED'), ':', backupPath))
-                .catch((err) => {
-                  displayError('Failed to CREATE backup', err);
-                })
-            )
-            .catch(() => console.log(color.yellow('No output to backup')));
-        }
-
-        outputsBackedUp.set(outputPath, prom);
+      if(backup) {
+        this.fileProm = this.fileProm.then((files) => this.backupFiles(files));
       }
 
-      // No matter what we continue once the promise is done (might be straight away)
-      prom.then(() => cb());
+      cb();
+    });
+
+    compiler.plugin('emit', (compilation, cb) => {
+      if(!this.fileProm) { return cb(); }
+
+      // We do the cleaning at emit time, so we are sure that the build succeeded
+      if(clean) {
+        this.fileProm = this.fileProm.then((files) => this.removeFiles(files));
+      }
+
+      this.fileProm.then(() => {
+        this.fileProm = null;
+        cb();
+      });
+    });
+
+    compiler.plugin('done', () => {
+      this.displayFeedback();
     });
   }
 }
