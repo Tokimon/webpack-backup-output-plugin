@@ -79,7 +79,7 @@ but you should make sure to define what type of file you want to handle in the
 setup. But often you just want one config to handle the backup, so you just add
 it to one config
 
-#### Example of differntiated backups
+#### Example of multi config backup
 ```js
 // Config 1
 const config1 = {
