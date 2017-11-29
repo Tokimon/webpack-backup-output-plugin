@@ -1,16 +1,16 @@
 # Webpack Backup Ouput Plugin
 
-Webpack plugin to create backup of the output folder (output folder name + timestamp) before files are emitted.
-Useful if your build is corrupted and you want to roll back to what you had before the compilation.
+Webpack plugin to create backup of the output folder (output folder name + timestamp) upon first compile.
+Useful if your build is corrupted and you want to roll back to what you had before the compilation, but also if you just want to clean your directory before you emit the new files.
 
 It supports multi webpack config instances which are run simultaneously, which means that the other webpack compilations
-won't emit files until the backup has been created.
+won't emit files until the backup has been created and/or files have been deleted.
 
-**Note**
+#### Note
 The backup will only be performed once for each launch, which means that the backup will only be performed upon starting up a watch build. For subsequent build the backup will not be performed.
 
-**Warning**
-If you have activated removal of the output folder, you NEED to activate the plugin for each build, otherwise the folder might be removed in the middle of files being emitted.
+#### Warning
+If you have activated removal of the output folder, you should activate the plugin for each build, otherwise the files and folders might be removed in the middle of files being emitted. If you give the same glob expression for `files` each build will wait for the clean to complete.
 
 ## Install
 
