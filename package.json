@@ -14,9 +14,9 @@
     "webpack",
     "backup",
     "clean",
+    "clear",
     "copy",
-    "event",
-    "emit",
+    "delete",
     "output"
   ],
   "author": "Toke Voltelen",
