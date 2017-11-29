@@ -8,12 +8,14 @@ const dateformat = require('dateformat');
 
 const cwd = process.cwd();
 
+const cleanPromises = {};
+const backupPromises = {};
+const filePromises = {};
 
+const count = {};
 
-function relativeToCwd(path) {
-  return nPath.relative(cwd, nPath.normalize(path))
-    .replace(/([.][.]?[\\/])*/, '');
-}
+let logs = [];
+let errors = [];
 
 
 
@@ -29,33 +31,121 @@ const defaultSettings = {
 class BackupOutputPlugin {
   constructor(options) {
     this.options = Object.assign(defaultSettings, options);
-    this.logs = [];
-    this.errors = [];
+    this.instanceAdded();
+  }
+
+  globToId() {
+    const { files: fileGlobs } = this.options;
+    return typeof fileGlobs === 'string' ? fileGlobs : fileGlobs.join('-');
+  }
+
+  instanceAdded() {
+    const id = this.globToId();
+
+    if(!count[id]) {
+      count[id] = { instance: 0, done: 0 };
+    }
+
+    count[id].instance++;
+  }
+
+  instanceDone() {
+    const id = this.globToId();
+    if(count[id]) { count[id].done++; }
+  }
+
+  getFiles() {
+    const id = this.globToId();
+
+    if(!filePromises[id]) {
+      let { files: fileGlobs } = this.options;
+      fileGlobs = (typeof fileGlobs === 'string' ? [fileGlobs] : fileGlobs)
+        .map((file) => nPath.join(this.outputPath, file));
+
+      filePromises[id] = glob(fileGlobs);
+    }
+
+    return filePromises[id];
+  }
+
+  removeEmptyDirectories() {
+    return glob(nPath.join(this.outputPath, '**', '!(*.*)'), { nodir: false })
+      .then((dirs) => dirs.filter((path) => fs.lstatSync(path).isDirectory()))
+      .then((dirs) => {
+        dirs.sort((a, b) => {
+          if(a === b) { return 0; }
+
+          const regex = /[/\\]/g;
+          const A = a.match(regex);
+          const B = b.match(regex);
+
+          if(!A && B) { return 1; }
+          if(A && !B) { return -1; }
+          if(!A && !B) { return a > b ? -1 : 1; }
+
+          const ALen = A.length;
+          const BLen = B.length;
+
+          if(ALen === BLen) { return a > b ? -1 : 1; }
+          return BLen - ALen;
+        });
+
+        return dirs;
+      })
+      .then((dirs) => dirs.reduce((removed, dir) => {
+        if(!fs.readdirSync(dir).length) {
+          try {
+            fs.removeSync(dir);
+            removed.push(dir);
+          } catch(error) {
+            errors.push({ message: `Failed to delete empty folder: ${dir}`, error });
+          }
+        }
+
+        return removed;
+      }, []));
   }
 
   removeFiles(files) {
-    return Promise.all(files.map((file) => fs.remove(file)))
-      .then(() => {
-        this.logs.push('Output folder cleaned');
-        return files;
-      })
-      .catch((error) => {
-        this.errors.push({
-          message: 'Failed to delete one or more files',
-          error
-        });
+    const id = this.globToId();
 
-        return files;
-      });
+    if(!cleanPromises[id]) {
+      if(!files.length) {
+        logs.push('No files in output folder to clean');
+        cleanPromises[id] = Promise.resolve(files);
+      } else {
+        cleanPromises[id] = Promise.all(files.map((file) => fs.remove(file)))
+          .then(() => this.removeEmptyDirectories())
+          .then(() => {
+            logs.push('Output folder cleaned');
+            return files;
+          })
+          .catch((error) => {
+            errors.push({
+              message: 'Failed to delete one or more files',
+              error
+            });
+
+            return files;
+          });
+      }
+    }
+
+    return cleanPromises[id];
   }
 
   backupFiles(files) {
     const { backupRoot } = this.options;
-    const backupPath = nPath.join(cwd, backupRoot, dateformat(new Date(), 'yyyy-mm-dd-HH-MM'));
+    const id = this.globToId();
 
-    return fs.stat(this.outputPath)
-      .then(() =>
-        Promise.all(
+    if(!backupPromises[id]) {
+      const backupPath = nPath.join(cwd, backupRoot, dateformat(new Date(), 'yyyy-mm-dd-HH-MM'));
+
+      if(!files.length) {
+        logs.push('No files in output folder to backup');
+        backupPromises[id] = Promise.resolve(files);
+      } else {
+        backupPromises[id] = Promise.all(
           files.map(
             (file) => {
               const copyPath = nPath.join(backupPath, nPath.relative(this.outputPath, file));
@@ -64,31 +154,34 @@ class BackupOutputPlugin {
           )
         )
           .then(() => {
-            this.logs.push('Files successfully backed up');
+            logs.push('Files successfully backed up');
             return files;
           })
           .catch((error) => {
-            this.errors.push({
+            errors.push({
               message: 'Failed to backup one or more files',
               error
             });
 
             return files;
-          })
-      )
-      .catch(() => {
-        this.logs.push('No files in output folder to backup');
-        return files;
-      });
+          });
+      }
+    }
+
+    return backupPromises[id];
   }
 
   displayFeedback() {
+    const id = this.globToId();
+    const currCount = count[id];
+    if(!currCount || currCount.instance > currCount.done) { return; }
+
     /* eslint-disable no-console */
     console.log('\n--- Backup Plugin ---');
 
-    this.logs.forEach((message) => console.log(color.yellow('- ' + message)));
+    logs.forEach((message) => console.log(color.yellow('- ' + message)));
 
-    this.errors.forEach(({ message, error }) => {
+    errors.forEach(({ message, error }) => {
       console.log(color.red(message));
       console.error(error.message);
       error.stack && console.errors(error.stack);
@@ -96,48 +189,49 @@ class BackupOutputPlugin {
 
     console.log('---------------------\n');
     /* eslint-enable */
+
+    logs = [];
+    errors = [];
   }
 
   apply(compiler) {
     let outputPath = compiler.options.output.path;
-    let { files: fileGlobs } = this.options;
     const { clean, backup } = this.options;
 
-    this.outputPath = relativeToCwd(outputPath);
-
-    fileGlobs = (typeof fileGlobs === 'string' ? [fileGlobs] : fileGlobs)
-      .map((file) => nPath.join(this.outputPath, file));
+    this.outputPath = nPath.resolve(cwd, outputPath);
 
     compiler.plugin('run', (compilation, cb) => {
-      this.logs = [];
-      this.errors = [];
+      logs = [];
+      errors = [];
 
       // We do the backup while compiler is running to save some time
-      this.fileProm = glob(fileGlobs);
+      this.prom = this.getFiles();
 
       if(backup) {
-        this.fileProm = this.fileProm.then((files) => this.backupFiles(files));
+        this.prom = this.prom.then((files) => this.backupFiles(files));
       }
 
       cb();
     });
 
     compiler.plugin('emit', (compilation, cb) => {
-      if(!this.fileProm) { return cb(); }
+      if(!this.prom) { return cb(); }
+
 
       // We do the cleaning at emit time, so we are sure that the build succeeded
       if(clean) {
-        this.fileProm = this.fileProm.then((files) => this.removeFiles(files));
+        this.prom = this.prom.then((files) => this.removeFiles(files));
       }
 
-      this.fileProm.then(() => {
-        this.fileProm = null;
-        cb();
-      });
+      this.prom.then(() => cb());
     });
 
     compiler.plugin('done', () => {
+      if(!this.prom) { return; }
+
+      this.instanceDone();
       this.displayFeedback();
+      this.prom = null;
     });
   }
 }
