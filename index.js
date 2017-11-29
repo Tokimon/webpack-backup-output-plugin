@@ -184,7 +184,7 @@ class BackupOutputPlugin {
     errors.forEach(({ message, error }) => {
       console.log(color.red(message));
       console.error(error.message);
-      error.stack && console.errors(error.stack);
+      if(error.stack) { console.errors(error.stack); }
     });
 
     console.log('---------------------\n');
