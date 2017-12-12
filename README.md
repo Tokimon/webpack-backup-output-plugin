@@ -1,6 +1,6 @@
 # Webpack Backup Ouput Plugin
 
-Webpack plugin to create backup of the output folder (output folder name + timestamp) upon first compile.
+Webpack plugin to create backup of the output folder ("backup-folder/timestamp") upon first compile.
 Useful if your build is corrupted and you want to roll back to what you had before the compilation, but also if you just want to clean your directory before you emit the new files.
 
 It supports multi webpack config instances which are run simultaneously, which means that the other webpack compilations
