@@ -19,11 +19,6 @@ If you have activated removal of the output folder, you should activate the plug
 npm install --save-dev webpack-backup-output-plugin
 ```
 
-**yarn**
-```
-yarn add --dev webpack-backup-output-plugin
-```
-
 ## Options
 
 * **clean**: [boolean=true] Remove the files in the output folder before emit
@@ -32,42 +27,14 @@ yarn add --dev webpack-backup-output-plugin
 * **backupRoot**: [string|boolean='\_webpack-backup'] Folder where to put backups (relative to current work directory).
 
 ## Usage
-
-#### ES6 Modules
 ```js
-import WebpackBackupOutputPlugin from 'webpack-backup-output-plugin';
+var WebpackBackupOutputPlugin = require('webpack-backup-output-plugin');
 
-// In the config
+// In your webpack config
 {
-  ... other settings
+  // ...
   plugins: [
-    new WebpackBackupOutputPlugin({ ... options ... })
-  ]
-}
-```
-
-#### ES5 (cjs)
-```js
-var WebpackBackupOutputPlugin = require('webpack-backup-output-plugin').default;
-
-// In the config
-{
-  ... other settings
-  plugins: [
-    new WebpackBackupOutputPlugin({ ... options ... })
-  ]
-}
-```
-
-#### Remove output folder without backup
-```js
-{
-  plugins: [
-    // Will result in a sort of "clean folder" (eg when in development)
-    new WebpackBackupOutputPlugin({
-      clean: true, // Will cause the designated files in the output folder to be removed
-      backup: false // Won't create the backup
-    })
+    new WebpackBackupOutputPlugin({ /* options */ })
   ]
 }
 ```
@@ -87,7 +54,7 @@ const config1 = {
     path: `/public`,
     filename: '[name].js?[chunkhash]'
   },
-  ... other settings ...
+  // ...
   plugins: [
     new WebpackBackupOutputPlugin({
       files: ['**/*.png', '*.js']
@@ -101,10 +68,10 @@ const config2 = {
     // Same output path is needed to have it wait for the backup to complete
     path: `/public`,
   },
-  ... other settings ...
+  // ...
   plugins: [
     new WebpackBackupOutputPlugin({
-      files: ['**/*.js']
+      files: '**/*.js'
     )
   ]
 }
@@ -112,11 +79,11 @@ const config2 = {
 // Config 3 (not affected by the previous backups)
 const config3 = {
   output: {
-    // Having another path makes it ignorant to the previous
-    // backups and only wait for its own backup to finish
+    // Having another path makes it ignore other backups
+    // and only wait for its own backup to finish
     path: `/web`
   },
-  ... other settings ...
+  // ...
   plugins: [
     new WebpackBackupOutputPlugin()
   ]

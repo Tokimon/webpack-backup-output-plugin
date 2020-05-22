@@ -1,13 +1,11 @@
 {
   "name": "webpack-backup-output-plugin",
   "version": "0.3.0",
-  "description": "Webpack plugin to create backup of the output folder before files are emitted",
-  "main": "index.es5.js",
-  "jsnext:main": "index.js",
-  "module": "index.js",
+  "description": "Webpack plugin to create backup of and/or clean the output folder before files are emitted",
+  "main": "index.js",
   "scripts": {
-    "prepublish": "npm run transpile",
-    "transpile": "babel index.js --out-file index.es5.js",
+    "prepublish": "npm run build",
+    "build": "rollup --config rollup.config.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -22,14 +20,24 @@
   "author": "Toke Voltelen",
   "license": "MIT",
   "dependencies": {
-    "colors": "^1.1.2",
-    "dateformat": "^3.0.2",
-    "fs-extra": "^4.0.2",
-    "globby": "^7.1.1"
+    "boxen": "4.2.0",
+    "colors": "1.4.0",
+    "date-fns": "2.14.0",
+    "fs-extra": "9.0.0",
+    "globby": "11.0.0"
   },
   "devDependencies": {
-    "@babel/cli": "^7.0.0-beta.32",
-    "@babel/core": "^7.0.0-beta.32",
-    "@babel/preset-env": "^7.0.0-beta.32"
+    "@babel/cli": "7.8.4",
+    "@babel/core": "7.9.6",
+    "@babel/preset-env": "7.9.6",
+    "@rollup/plugin-babel": "5.0.2",
+    "eslint": "7.0.0",
+    "eslint-config-standard": "14.1.1",
+    "eslint-plugin-import": "2.20.2",
+    "eslint-plugin-node": "11.1.0",
+    "eslint-plugin-promise": "4.2.1",
+    "eslint-plugin-standard": "4.0.1",
+    "rollup": "2.10.7",
+    "rollup-plugin-terser": "5.3.0"
   }
 }
